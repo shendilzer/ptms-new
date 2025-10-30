@@ -1021,7 +1021,7 @@ const printPermit = () => {
 
               <div class="signature-box">
                 <div class="signature-line"></div>
-                <div class="signature-label">ATTY. JOSE JUDE L.P. DOROMAL</div>
+                <div class="signature-label">ATTY. JOSE JOEL P. DOROMAL</div>
                 <div style="font-size: 9px; color: #666; margin-top: 1mm;">Municipal Mayor / Chairman MMTFRB</div>
               </div>
             </div>
@@ -1520,7 +1520,7 @@ const printIdCard = () => {
 
             <div class="signature-section">
               <div class="signature-line"></div>
-              <div class="signature-label">ATTY JOSE JUDE L.P. DOROMAL</div>
+              <div class="signature-label">ATTY JOSE JOEL P. DOROMAL</div>
               <div class="signature-label">MUNICIPAL MAYOR / CHAIRMAN MMTFRB</div>
             </div>
 
