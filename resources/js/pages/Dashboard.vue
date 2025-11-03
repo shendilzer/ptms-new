@@ -60,15 +60,10 @@ const perPage = ref(10);
 
 // Print Modals
 const showPrintModal = ref(false);
-const showIdPrintModal = ref(false);
 const showReportModal = ref(false);
 const showPermitReportModal = ref(false);
-const showIdReportModal = ref(false);
 const selectedOperator = ref<Operator | null>(null);
 const printLoading = ref(false);
-const idPrintLoading = ref(false);
-const bodyNumber = ref('');
-const stickerNumber = ref('');
 const orNumber = ref('');
 
 // Report Logs
@@ -281,7 +276,7 @@ const getQuarterBadgeColor = (quarter: string) => {
 };
 
 // Print Logging Functions
-const addPrintLog = (type: 'permit' | 'id_card', operator: Operator, orNumber?: string, bodyNumber?: string, stickerNumber?: string) => {
+const addPrintLog = (type: 'permit', operator: Operator, orNumber?: string) => {
   const log: PrintLog = {
     id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
     type,
@@ -289,8 +284,6 @@ const addPrintLog = (type: 'permit' | 'id_card', operator: Operator, orNumber?: 
     driver_name: operator.driver_fullname || 'N/A',
     mtop_number: operator.mtop_number,
     or_number: orNumber,
-    body_number: bodyNumber,
-    sticker_number: stickerNumber,
     quarter: getQuarterFromDate(operator.date_last_paid || operator.date_registered),
     printed_by: 'System User',
     printed_at: new Date().toLocaleString('en-PH', {
@@ -354,33 +347,19 @@ const filteredPermitLogs = computed(() => {
   return filteredLogs.value.filter(log => log.type === 'permit');
 });
 
-const filteredIdLogs = computed(() => {
-  return filteredLogs.value.filter(log => log.type === 'id_card');
-});
-
 const getPrintStats = computed(() => {
   const filtered = filteredLogs.value;
   const permitCount = filtered.filter(log => log.type === 'permit').length;
-  const idCardCount = filtered.filter(log => log.type === 'id_card').length;
 
   return {
     total: filtered.length,
     permits: permitCount,
-    id_cards: idCardCount,
     date_range: `${new Date(reportDateRange.value.start).toLocaleDateString()} - ${new Date(reportDateRange.value.end).toLocaleDateString()}`
   };
 });
 
 const getPermitStats = computed(() => {
   const filtered = filteredPermitLogs.value;
-  return {
-    total: filtered.length,
-    date_range: `${new Date(reportDateRange.value.start).toLocaleDateString()} - ${new Date(reportDateRange.value.end).toLocaleDateString()}`
-  };
-});
-
-const getIdStats = computed(() => {
-  const filtered = filteredIdLogs.value;
   return {
     total: filtered.length,
     date_range: `${new Date(reportDateRange.value.start).toLocaleDateString()} - ${new Date(reportDateRange.value.end).toLocaleDateString()}`
@@ -400,19 +379,6 @@ const openPrintModal = (operator: Operator) => {
   showPrintModal.value = true;
 };
 
-const openIdPrintModal = (operator: Operator) => {
-  // Check if operator is retired
-  if (operator.permit_status === 'retire') {
-    alert('Cannot print ID card: This operator is currently retired. Please renew the permit first.');
-    return;
-  }
-
-  selectedOperator.value = operator;
-  bodyNumber.value = '';
-  stickerNumber.value = '';
-  showIdPrintModal.value = true;
-};
-
 const openReportModal = () => {
   loadPrintLogs();
   showReportModal.value = true;
@@ -423,22 +389,12 @@ const openPermitReportModal = () => {
   showPermitReportModal.value = true;
 };
 
-const openIdReportModal = () => {
-  loadPrintLogs();
-  showIdReportModal.value = true;
-};
-
 const closePrintModal = () => {
   showPrintModal.value = false;
-  showIdPrintModal.value = false;
   showReportModal.value = false;
   showPermitReportModal.value = false;
-  showIdReportModal.value = false;
   selectedOperator.value = null;
   printLoading.value = false;
-  idPrintLoading.value = false;
-  bodyNumber.value = '';
-  stickerNumber.value = '';
   orNumber.value = '';
 };
 
@@ -1086,562 +1042,6 @@ const printPermit = () => {
   }
 };
 
-// FIXED: Print ID Card Function
-const printIdCard = () => {
-  if (!selectedOperator.value || !bodyNumber.value.trim() || !stickerNumber.value.trim()) {
-    alert('Please enter both Body Number and Sticker Number before printing.');
-    return;
-  }
-
-  // Additional retirement check
-  if (selectedOperator.value.permit_status === 'retire') {
-    alert('Cannot print ID card: This operator is currently retired. Please renew the permit first.');
-    return;
-  }
-
-  idPrintLoading.value = true;
-
-  try {
-    const operator = selectedOperator.value!;
-
-    // Add to print log
-    addPrintLog('id_card', operator, undefined, bodyNumber.value, stickerNumber.value);
-
-    const operatorName = operator.fullname;
-    const driverName = operator.driver_fullname || 'N/A';
-    const mtopNumber = operator.mtop_number;
-    const todaName = operator.toda_name || 'N/A';
-    const currentYear = new Date().getFullYear();
-    const validUntil = `December 31, ${currentYear + 1}`;
-
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>ID Card - ${driverName}</title>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          @page {
-            size: A4 portrait;
-            margin: 0;
-          }
-
-          * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-          }
-
-          body {
-            font-family: 'Arial', 'Helvetica', sans-serif;
-            background: white;
-            color: black;
-            width: 210mm;
-            height: 297mm;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-          }
-
-          .id-card-container {
-            width: 85.6mm;  /* Standard ID card width */
-            height: 53.98mm; /* Standard ID card height */
-            display: flex;
-            position: relative;
-            transform: scale(2.2); /* Scale to fit A4 */
-            transform-origin: center;
-            margin: 0 auto;
-          }
-
-          .id-front, .id-back {
-            width: 85.6mm;
-            height: 53.98mm;
-            position: absolute;
-            border: 1px solid #ccc;
-            background: white;
-          }
-
-          .id-front {
-            /* Front side styling */
-            padding: 3mm;
-            display: flex;
-            flex-direction: column;
-          }
-
-          .id-back {
-            /* Position back side next to front side */
-            left: 90mm; /* Space between front and back */
-          }
-
-          /* Front Side Styles */
-          .header {
-            text-align: center;
-            margin-bottom: 2mm;
-          }
-
-          .main-title {
-            font-size: 8pt;
-            font-weight: bold;
-            color: #2c5aa0;
-            margin-bottom: 1mm;
-            line-height: 1;
-          }
-
-          .subtitle {
-            font-size: 6pt;
-            font-weight: bold;
-            color: #2c5aa0;
-            margin-bottom: 1mm;
-            line-height: 1;
-          }
-
-          .id-type {
-            font-size: 7pt;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 2mm;
-            text-decoration: underline;
-          }
-
-          .body-number-section {
-            text-align: center;
-            margin-bottom: 2mm;
-          }
-
-          .body-number-label {
-            font-size: 6pt;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 1mm;
-          }
-
-          .body-number {
-            font-size: 14pt;
-            font-weight: bold;
-            color: #2c5aa0;
-            background: #f0f4ff;
-            padding: 1mm 3mm;
-            border: 1px solid #2c5aa0;
-            border-radius: 3px;
-            display: inline-block;
-          }
-
-          .sticker-number {
-            font-size: 6pt;
-            font-weight: bold;
-            color: #333;
-            margin-top: 1mm;
-          }
-
-          .driver-info {
-            margin-bottom: 2mm;
-            padding: 2mm;
-            background: #f8f9fa;
-            border-radius: 2px;
-            border-left: 2px solid #2c5aa0;
-            flex-grow: 1;
-          }
-
-          .info-line {
-            margin-bottom: 1mm;
-          }
-
-          .info-label {
-            font-weight: bold;
-            color: #2c5aa0;
-            display: block;
-            font-size: 5pt;
-          }
-
-          .info-value {
-            font-weight: bold;
-            color: #333;
-            font-size: 6pt;
-          }
-
-          .signature-section {
-            text-align: center;
-            margin-top: 1mm;
-          }
-
-          .signature-line {
-            width: 30mm;
-            height: 0.5px;
-            border-bottom: 1px solid #333;
-            margin: 0 auto 0.5mm auto;
-          }
-
-          .signature-label {
-            font-size: 5pt;
-            color: #333;
-            font-weight: bold;
-            line-height: 1;
-          }
-
-          .validity {
-            font-size: 4pt;
-            text-align: center;
-            margin-top: 1mm;
-            color: #666;
-            line-height: 1;
-          }
-
-          .change-notice {
-            font-size: 3.5pt;
-            text-align: center;
-            margin-top: 1mm;
-            color: #d63333;
-            font-weight: bold;
-            line-height: 1;
-          }
-
-          /* Back Side Styles */
-          .id-back {
-            padding: 2mm;
-            display: flex;
-            flex-direction: column;
-          }
-
-          .back-header {
-            text-align: center;
-            margin-bottom: 1mm;
-          }
-
-          .back-title {
-            font-size: 7pt;
-            font-weight: bold;
-            color: #2c5aa0;
-          }
-
-          .back-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 1mm;
-          }
-
-          .back-section {
-            padding: 1mm;
-            background: white;
-            border-radius: 1px;
-            border-left: 1px solid #2c5aa0;
-          }
-
-          .back-label {
-            font-weight: bold;
-            font-size: 4pt;
-            color: #2c5aa0;
-            display: block;
-          }
-
-          .back-value {
-            font-size: 5pt;
-            font-weight: bold;
-            color: #333;
-          }
-
-          .complaint-section {
-            background: #fff3cd;
-            border: 0.5px solid #ffc107;
-            border-radius: 1px;
-            padding: 1mm;
-          }
-
-          .complaint-title {
-            font-size: 5pt;
-            font-weight: bold;
-            color: #856404;
-            text-align: center;
-            margin-bottom: 0.5mm;
-          }
-
-          .contact-info {
-            font-size: 4pt;
-            color: #333;
-            line-height: 1;
-            text-align: center;
-          }
-
-          .toda-section {
-            background: #d1ecf1;
-            border: 0.5px solid #0dcaf0;
-            border-radius: 1px;
-            padding: 1mm;
-            text-align: center;
-          }
-
-          .toda-title {
-            font-size: 4pt;
-            font-weight: bold;
-            color: #055160;
-          }
-
-          .toda-value {
-            font-size: 5pt;
-            font-weight: bold;
-            color: #333;
-          }
-
-          .permit-number {
-            background: #d4edda;
-            border: 0.5px solid #198754;
-            border-radius: 1px;
-            padding: 1mm;
-            text-align: center;
-          }
-
-          .permit-title {
-            font-size: 4pt;
-            font-weight: bold;
-            color: #0f5132;
-          }
-
-          .permit-value {
-            font-size: 5pt;
-            font-weight: bold;
-            color: #333;
-          }
-
-          .emergency-section {
-            background: #f8d7da;
-            border: 0.5px solid #dc3545;
-            border-radius: 1px;
-            padding: 1mm;
-          }
-
-          .emergency-title {
-            font-size: 5pt;
-            font-weight: bold;
-            color: #721c24;
-            text-align: center;
-            margin-bottom: 0.5mm;
-          }
-
-          .emergency-numbers {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5mm;
-          }
-
-          .emergency-item {
-            text-align: center;
-            padding: 0.5mm;
-            background: white;
-            border-radius: 1px;
-            font-size: 3.5pt;
-          }
-
-          .emergency-department {
-            font-weight: bold;
-            color: #333;
-          }
-
-          .emergency-number {
-            font-weight: bold;
-            color: #dc3545;
-          }
-
-          @media print {
-            body {
-              margin: 0;
-              padding: 0;
-              width: 210mm;
-              height: 297mm;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-            }
-
-            .id-card-container {
-              transform: scale(2.2);
-              margin: 0 auto;
-            }
-
-            .no-print {
-              display: none !important;
-            }
-          }
-
-          .print-controls {
-            text-align: center;
-            margin: 10mm;
-          }
-
-          .print-controls button {
-            padding: 4mm 8mm;
-            margin: 2mm;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 11pt;
-            font-weight: bold;
-          }
-
-          .print-btn {
-            background: #2c5aa0;
-            color: white;
-          }
-
-          .close-btn {
-            background: #6b7280;
-            color: white;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="id-card-container">
-          <!-- Front Side -->
-          <div class="id-front">
-            <div class="header">
-              <div class="main-title">MARAMAG MOTORIZED TRICYCLE</div>
-              <div class="subtitle">FRANCHISING REGULATORY BOARD</div>
-              <div class="subtitle">( MMTFRB )</div>
-              <div class="id-type">DRIVER'S IDENTIFICATION</div>
-            </div>
-
-            <div class="body-number-section">
-              <div class="body-number-label">BODY NO.:</div>
-              <div class="body-number">${bodyNumber.value}</div>
-              <div class="sticker-number">STICKER NO.: ${stickerNumber.value}</div>
-            </div>
-
-            <div class="driver-info">
-              <div class="info-line">
-                <span class="info-label">NAME OF DRIVER</span>
-                <span class="info-value">${driverName}</span>
-              </div>
-              <div class="info-line">
-                <span class="info-label">NAME OF OPERATOR</span>
-                <span class="info-value">${operatorName}</span>
-              </div>
-            </div>
-
-            <div class="signature-section">
-              <div class="signature-line"></div>
-              <div class="signature-label">ATTY JOSE JOEL P. DOROMAL</div>
-              <div class="signature-label">MUNICIPAL MAYOR / CHAIRMAN MMTFRB</div>
-            </div>
-
-            <div class="validity">
-              THIS ID IS VALID UNTIL ${validUntil}
-            </div>
-
-            <div class="change-notice">
-              IN CASE OF CHANGE OF DRIVER, PLEASE SURRENDER THIS ID TO THE BUSINESS PERMIT & LICENSING OFFICE (BPLO)
-            </div>
-          </div>
-
-          <!-- Back Side - Positioned next to front side -->
-          <div class="id-back">
-            <div class="back-header">
-              <div class="back-title">DRIVER INFORMATION</div>
-            </div>
-
-            <div class="back-content">
-              <div class="back-section">
-                <span class="back-label">NAME OF DRIVER:</span>
-                <span class="back-value">${driverName}</span>
-              </div>
-
-              <div class="back-section">
-                <span class="back-label">BODY NO.:</span>
-                <span class="back-value">${bodyNumber.value}</span>
-              </div>
-
-              <div class="complaint-section">
-                <div class="complaint-title">IN CASE OF COMPLAINT:</div>
-                <div class="contact-info">
-                  📍 09752478085 | 088 828 1811<br>
-                  📎 bplo_maramag@gmail.com
-                </div>
-              </div>
-
-              <div class="toda-section">
-                <div class="toda-title">TODA:</div>
-                <div class="toda-value">${todaName}</div>
-              </div>
-
-              <div class="permit-number">
-                <div class="permit-title">PERMIT NO.:</div>
-                <div class="permit-value">${mtopNumber}-${new Date().getFullYear()}</div>
-              </div>
-
-              <div class="emergency-section">
-                <div class="emergency-title">EMERGENCY HOTLINE NUMBERS</div>
-                <div class="emergency-numbers">
-                  <div class="emergency-item">
-                    <div class="emergency-department">MDRRMO/RESCUE</div>
-                    <div class="emergency-number">0966-768-2770</div>
-                  </div>
-                  <div class="emergency-item">
-                    <div class="emergency-department">MHO - MARAMAG</div>
-                    <div class="emergency-number">0966-042-2004</div>
-                  </div>
-                  <div class="emergency-item">
-                    <div class="emergency-department">BFP - MARAMAG</div>
-                    <div class="emergency-number">0917-516-3291</div>
-                  </div>
-                  <div class="emergency-item">
-                    <div class="emergency-department">PNP - MARAMAG</div>
-                    <div class="emergency-number">0953-125-6859</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Print Controls -->
-        <div class="no-print print-controls">
-          <button onclick="window.print()" class="print-btn">🖨️ Print ID Card</button>
-          <button onclick="window.close()" class="close-btn">❌ Close Window</button>
-          <p style="font-size: 10pt; color: #666; margin-top: 5mm;">
-            Print Size: A4 Portrait | Front and Back on One Page | Cut along the edges
-          </p>
-        </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(() => {
-              window.print();
-            }, 500);
-
-            window.onafterprint = function() {
-              setTimeout(() => {
-                window.close();
-              }, 100);
-            };
-          };
-        <\/script>
-      </body>
-      </html>
-    `;
-
-    // FIXED: Create print window and write content
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-
-      // Wait for content to load before printing
-      printWindow.onload = () => {
-        printWindow.focus();
-      };
-    } else {
-      throw new Error('Popup blocked! Please allow popups for this site.');
-    }
-
-  } catch (err: any) {
-    console.error('Error printing ID card:', err);
-    alert('Error generating ID card preview: ' + err.message);
-  } finally {
-    idPrintLoading.value = false;
-    closePrintModal();
-  }
-};
-
 // FIXED: Report Printing Functions
 const printReport = () => {
   reportLoading.value = true;
@@ -1714,7 +1114,7 @@ const printReport = () => {
 
           .stats-section {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 4mm;
             margin-bottom: 6mm;
             padding: 3mm;
@@ -1788,12 +1188,6 @@ const printReport = () => {
             border: 1px solid #1e40af;
           }
 
-          .type-id_card {
-            background: #dcfce7;
-            color: #166534;
-            border: 1px solid #166534;
-          }
-
           .report-footer {
             text-align: center;
             margin-top: 8mm;
@@ -1838,25 +1232,17 @@ const printReport = () => {
               <div class="stat-value">${stats.permits}</div>
               <div class="stat-label">Permits Printed</div>
             </div>
-            <div class="stat-item">
-              <div class="stat-value">${stats.id_cards}</div>
-              <div class="stat-label">ID Cards Printed</div>
-            </div>
           </div>
 
           <table class="logs-table">
             <thead>
               <tr>
-                <th style="width: 12%">Date & Time</th>
-                <th style="width: 8%">Type</th>
-                <th style="width: 15%">Operator</th>
-                <th style="width: 15%">Driver</th>
-                <th style="width: 10%">MTOP No.</th>
-                <th style="width: 10%">OR Number</th>
-                <th style="width: 8%">Body No.</th>
-                <th style="width: 8%">Sticker No.</th>
-                <th style="width: 8%">Quarter</th>
-                <th style="width: 6%">Printed By</th>
+                <th style="width: 15%">Date & Time</th>
+                <th style="width: 10%">Type</th>
+                <th style="width: 20%">Operator</th>
+                <th style="width: 20%">Driver</th>
+                <th style="width: 15%">MTOP No.</th>
+                <th style="width: 20%">OR Number</th>
               </tr>
             </thead>
             <tbody>
@@ -1864,18 +1250,14 @@ const printReport = () => {
                 <tr>
                   <td>${log.printed_at}</td>
                   <td>
-                    <span class="type-badge ${log.type === 'permit' ? 'type-permit' : 'type-id_card'}">
-                      ${log.type === 'permit' ? 'Permit' : 'ID Card'}
+                    <span class="type-badge type-permit">
+                      Permit
                     </span>
                   </td>
                   <td>${log.operator_name}</td>
                   <td>${log.driver_name}</td>
                   <td>${log.mtop_number}</td>
                   <td>${log.or_number || 'N/A'}</td>
-                  <td>${log.body_number || 'N/A'}</td>
-                  <td>${log.sticker_number || 'N/A'}</td>
-                  <td>${log.quarter}</td>
-                  <td>${log.printed_by}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1922,18 +1304,14 @@ const printReport = () => {
 const exportReport = () => {
   const stats = getPrintStats.value;
   const csvContent = [
-    ['Date & Time', 'Type', 'Operator', 'Driver', 'MTOP Number', 'OR Number', 'Body Number', 'Sticker Number', 'Quarter', 'Printed By'],
+    ['Date & Time', 'Type', 'Operator', 'Driver', 'MTOP Number', 'OR Number'],
     ...filteredLogs.value.map(log => [
       log.printed_at,
-      log.type === 'permit' ? 'Permit' : 'ID Card',
+      'Permit',
       log.operator_name,
       log.driver_name,
       log.mtop_number,
-      log.or_number || 'N/A',
-      log.body_number || 'N/A',
-      log.sticker_number || 'N/A',
-      log.quarter,
-      log.printed_by
+      log.or_number || 'N/A'
     ])
   ].map(row => row.map(field => `"${field}"`).join(',')).join('\n');
 
@@ -1951,15 +1329,13 @@ const exportReport = () => {
 const exportPermitReport = () => {
   const stats = getPermitStats.value;
   const csvContent = [
-    ['Date & Time', 'Operator', 'Driver', 'MTOP Number', 'OR Number', 'Quarter', 'Printed By'],
+    ['Date & Time', 'Operator', 'Driver', 'MTOP Number', 'OR Number'],
     ...filteredPermitLogs.value.map(log => [
       log.printed_at,
       log.operator_name,
       log.driver_name,
       log.mtop_number,
-      log.or_number || 'N/A',
-      log.quarter,
-      log.printed_by
+      log.or_number || 'N/A'
     ])
   ].map(row => row.map(field => `"${field}"`).join(',')).join('\n');
 
@@ -1968,33 +1344,6 @@ const exportPermitReport = () => {
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
   link.setAttribute('download', `maramag_permit_report_${reportDateRange.value.start}_to_${reportDateRange.value.end}.csv`);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-const exportIdReport = () => {
-  const stats = getIdStats.value;
-  const csvContent = [
-    ['Date & Time', 'Operator', 'Driver', 'MTOP Number', 'Body Number', 'Sticker Number', 'Quarter', 'Printed By'],
-    ...filteredIdLogs.value.map(log => [
-      log.printed_at,
-      log.operator_name,
-      log.driver_name,
-      log.mtop_number,
-      log.body_number || 'N/A',
-      log.sticker_number || 'N/A',
-      log.quarter,
-      log.printed_by
-    ])
-  ].map(row => row.map(field => `"${field}"`).join(',')).join('\n');
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', `maramag_id_report_${reportDateRange.value.start}_to_${reportDateRange.value.end}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -2176,12 +1525,11 @@ const printPermitReport = () => {
           <table class="logs-table">
             <thead>
               <tr>
-                <th style="width: 15%">Date & Time</th>
-                <th style="width: 20%">Operator</th>
-                <th style="width: 20%">Driver</th>
+                <th style="width: 20%">Date & Time</th>
+                <th style="width: 25%">Operator</th>
+                <th style="width: 25%">Driver</th>
                 <th style="width: 15%">MTOP No.</th>
                 <th style="width: 15%">OR Number</th>
-                <th style="width: 15%">Quarter</th>
               </tr>
             </thead>
             <tbody>
@@ -2192,7 +1540,6 @@ const printPermitReport = () => {
                   <td>${log.driver_name}</td>
                   <td>${log.mtop_number}</td>
                   <td>${log.or_number || 'N/A'}</td>
-                  <td>${log.quarter}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -2235,240 +1582,6 @@ const printPermitReport = () => {
   }
 };
 
-const printIdReport = () => {
-  reportLoading.value = true;
-
-  try {
-    const stats = getIdStats.value;
-
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>ID Card Print Report - ${stats.date_range}</title>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          @page {
-            size: A4;
-            margin: 15mm;
-          }
-
-          * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-          }
-
-          body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background: white;
-            color: black;
-            font-size: 12px;
-            line-height: 1.4;
-          }
-
-          .report-container {
-            max-width: 100%;
-            margin: 0 auto;
-          }
-
-          .report-header {
-            text-align: center;
-            margin-bottom: 8mm;
-            border-bottom: 2px solid #166534;
-            padding-bottom: 4mm;
-          }
-
-          .report-header h1 {
-            margin: 0 0 2mm 0;
-            font-size: 24px;
-            color: #166534;
-            font-weight: bold;
-            text-transform: uppercase;
-          }
-
-          .report-header h2 {
-            margin: 0 0 1mm 0;
-            font-size: 18px;
-            color: #374151;
-            font-weight: 600;
-          }
-
-          .report-header h3 {
-            margin: 0;
-            font-size: 14px;
-            color: #6b7280;
-            font-weight: normal;
-          }
-
-          .stats-section {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 4mm;
-            margin-bottom: 6mm;
-            padding: 3mm;
-            background: #f0fdf4;
-            border: 1px solid #dcfce7;
-            border-radius: 6px;
-          }
-
-          .stat-item {
-            text-align: center;
-            padding: 3mm;
-            background: white;
-            border-radius: 4px;
-            border: 1px solid #dcfce7;
-          }
-
-          .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #166534;
-            margin-bottom: 1mm;
-          }
-
-          .stat-label {
-            font-size: 12px;
-            color: #64748b;
-            font-weight: 600;
-            text-transform: uppercase;
-          }
-
-          .logs-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 6mm;
-          }
-
-          .logs-table th {
-            background: #166534;
-            color: white;
-            padding: 2mm 1mm;
-            text-align: left;
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-            border: 1px solid #14532d;
-          }
-
-          .logs-table td {
-            padding: 1.5mm 1mm;
-            border: 1px solid #e2e8f0;
-            font-size: 10px;
-            vertical-align: top;
-          }
-
-          .logs-table tr:nth-child(even) {
-            background: #f0fdf4;
-          }
-
-          .report-footer {
-            text-align: center;
-            margin-top: 8mm;
-            padding-top: 3mm;
-            border-top: 1px solid #e2e8f0;
-            font-size: 10px;
-            color: #64748b;
-          }
-
-          @media print {
-            body {
-              margin: 0;
-              padding: 0;
-              background: white !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-
-            .no-print {
-              display: none !important;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="report-container">
-          <div class="report-header">
-            <h1>MUNICIPALITY OF MARAMAG</h1>
-            <h2>ID CARD PRINTING REPORT</h2>
-            <h3>MARAMAG MOTORIZED TRICYCLE FRANCHISING REGULATORY BOARD</h3>
-            <p style="margin-top: 2mm; font-size: 12px; color: #6b7280;">
-              Date Range: ${stats.date_range}
-            </p>
-          </div>
-
-          <div class="stats-section">
-            <div class="stat-item">
-              <div class="stat-value">${stats.total}</div>
-              <div class="stat-label">ID Cards Printed</div>
-            </div>
-          </div>
-
-          <table class="logs-table">
-            <thead>
-              <tr>
-                <th style="width: 15%">Date & Time</th>
-                <th style="width: 20%">Operator</th>
-                <th style="width: 20%">Driver</th>
-                <th style="width: 15%">MTOP No.</th>
-                <th style="width: 15%">Body No.</th>
-                <th style="width: 15%">Sticker No.</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredIdLogs.value.map(log => `
-                <tr>
-                  <td>${log.printed_at}</td>
-                  <td>${log.operator_name}</td>
-                  <td>${log.driver_name}</td>
-                  <td>${log.mtop_number}</td>
-                  <td>${log.body_number || 'N/A'}</td>
-                  <td>${log.sticker_number || 'N/A'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-
-          <div class="report-footer">
-            <p><strong>Generated by:</strong> MARAMAG MMTFRB System</p>
-            <p>MARAMAG MUNICIPALITY • BUSINESS PERMIT & LICENSING OFFICE • www.maramag.gov.ph</p>
-            <p style="margin-top: 2mm;">Generated on: ${new Date().toLocaleString('en-PH')}</p>
-          </div>
-        </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(() => {
-              window.print();
-            }, 500);
-          };
-        <\/script>
-      </body>
-      </html>
-    `;
-
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.focus();
-      };
-    } else {
-      throw new Error('Popup blocked! Please allow popups for this site.');
-    }
-
-  } catch (err: any) {
-    console.error('Error printing ID report:', err);
-    alert('Error generating ID report preview: ' + err.message);
-  } finally {
-    reportLoading.value = false;
-  }
-};
-
 onMounted(async () => {
   await fetchStats();
   loadPrintLogs();
@@ -2503,7 +1616,7 @@ onMounted(async () => {
           <h1 class="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
             Operator Management Dashboard
           </h1>
-          <p class="text-gray-400 text-lg">Manage tricycle operators, print permits and ID cards</p>
+          <p class="text-gray-400 text-lg">Manage tricycle operators and print permits</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
           <button
@@ -2516,17 +1629,6 @@ onMounted(async () => {
               </svg>
             </div>
             <span class="font-semibold">Permit Reports</span>
-          </button>
-          <button
-            @click="openIdReportModal"
-            class="group px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl transition-all duration-300 flex items-center gap-3 shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40 transform hover:scale-105"
-          >
-            <div class="p-2 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <span class="font-semibold">ID Reports</span>
           </button>
           <button
             @click="openReportModal"
@@ -2618,14 +1720,10 @@ onMounted(async () => {
             </div>
             Recent Print Activity
           </h3>
-          <div class="grid grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 gap-4">
             <div class="text-center p-4 bg-gray-700/50 rounded-xl backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/80 hover:scale-105">
               <div class="text-blue-400 text-2xl font-bold mb-2">{{ printLogs.filter(log => log.type === 'permit').length }}</div>
               <div class="text-gray-300 text-sm">Permits Printed</div>
-            </div>
-            <div class="text-center p-4 bg-gray-700/50 rounded-xl backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/80 hover:scale-105">
-              <div class="text-green-400 text-2xl font-bold mb-2">{{ printLogs.filter(log => log.type === 'id_card').length }}</div>
-              <div class="text-gray-300 text-sm">ID Cards Printed</div>
             </div>
             <div class="text-center p-4 bg-gray-700/50 rounded-xl backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/80 hover:scale-105">
               <div class="text-purple-400 text-2xl font-bold mb-2">{{ printLogs.length }}</div>
@@ -2790,22 +1888,6 @@ onMounted(async () => {
                       </svg>
                       {{ operator.permit_status === 'retire' ? 'Disabled' : 'Permit' }}
                     </button>
-                    <button
-                      @click="openIdPrintModal(operator)"
-                      :disabled="operator.permit_status === 'retire'"
-                      :class="[
-                        'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2',
-                        operator.permit_status === 'retire'
-                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40 transform hover:scale-105'
-                      ]"
-                      :title="operator.permit_status === 'retire' ? 'Renew permit to enable printing' : 'Print ID Card'"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
-                      </svg>
-                      {{ operator.permit_status === 'retire' ? 'Disabled' : 'ID Card' }}
-                    </button>
                   </div>
                   <!-- Retirement warning for desktop -->
                   <div v-if="operator.permit_status === 'retire'" class="hidden sm:block mt-2">
@@ -2931,96 +2013,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Print ID Modal -->
-    <div v-if="showIdPrintModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-lg max-w-md w-full">
-        <div class="p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Print MARAMAG MMTFRB ID Card</h3>
-
-          <!-- Retirement Warning in Modal -->
-          <div v-if="selectedOperator?.permit_status === 'retire'" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <div class="flex items-center">
-              <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-              </svg>
-              <strong class="font-bold">Permit Retired - Printing Disabled</strong>
-            </div>
-            <p class="text-sm mt-1">This operator's permit is currently retired. Please renew the permit to enable printing.</p>
-          </div>
-
-          <p class="text-gray-600 mb-4" :class="{'opacity-50': selectedOperator?.permit_status === 'retire'}">
-            Print official ID card for <strong>{{ selectedOperator?.driver_fullname || 'N/A' }}</strong>?
-            <br><span class="text-sm text-blue-600">Print Size: A4 Portrait (Front and Back on One Page)</span>
-          </p>
-
-          <div class="space-y-4 mb-4" :class="{'opacity-50': selectedOperator?.permit_status === 'retire'}">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Body Number *
-              </label>
-              <input
-                v-model="bodyNumber"
-                type="text"
-                placeholder="Enter body number (e.g., 0063)"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                :disabled="selectedOperator?.permit_status === 'retire'"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Sticker Number *
-              </label>
-              <input
-                v-model="stickerNumber"
-                type="text"
-                placeholder="Enter sticker number"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                :disabled="selectedOperator?.permit_status === 'retire'"
-                required
-              />
-            </div>
-          </div>
-
-          <div class="bg-gray-50 p-3 rounded-md mb-4" :class="{'opacity-50': selectedOperator?.permit_status === 'retire'}">
-            <h4 class="text-sm font-medium text-gray-700 mb-2">ID Card Information:</h4>
-            <div class="text-xs text-gray-600 space-y-1">
-              <div><strong>Driver:</strong> {{ selectedOperator?.driver_fullname || 'N/A' }}</div>
-              <div><strong>Operator:</strong> {{ selectedOperator?.fullname }}</div>
-              <div><strong>TODA:</strong> {{ selectedOperator?.toda_name || 'N/A' }}</div>
-              <div><strong>MTOP No:</strong> {{ selectedOperator?.mtop_number }}</div>
-              <div><strong>Status:</strong>
-                <span :class="['ml-1 px-2 py-1 rounded-full text-xs font-medium', getStatusColor(selectedOperator?.permit_status || '')]">
-                  {{ getStatusText(selectedOperator?.permit_status || '') }}
-                </span>
-              </div>
-              <div><strong>Current Quarter:</strong> {{ selectedOperator ? getQuarterFromDate(selectedOperator.date_last_paid || selectedOperator.date_registered) : 'N/A' }}</div>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-3">
-            <button
-              @click="closePrintModal"
-              class="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
-              :disabled="idPrintLoading"
-            >
-              Cancel
-            </button>
-            <button
-              @click="printIdCard"
-              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
-              :disabled="idPrintLoading || !bodyNumber.trim() || !stickerNumber.trim() || selectedOperator?.permit_status === 'retire'"
-              :class="{'opacity-50 cursor-not-allowed': selectedOperator?.permit_status === 'retire'}"
-            >
-              <span v-if="idPrintLoading" class="spinner-border inline-block h-4 w-4 animate-spin rounded-full border-2 border-t-white border-green-200"></span>
-              {{ selectedOperator?.permit_status === 'retire' ? 'Printing Disabled' : (idPrintLoading ? 'Printing...' : 'Print ID Card') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- All Reports Modal -->
     <div v-if="showReportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
@@ -3069,7 +2061,7 @@ onMounted(async () => {
           </div>
 
           <!-- Statistics -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <div class="text-2xl font-bold text-blue-600">{{ getPrintStats.total }}</div>
               <div class="text-sm text-blue-800 font-medium">Total Prints</div>
@@ -3077,10 +2069,6 @@ onMounted(async () => {
             <div class="bg-green-50 p-4 rounded-lg border border-green-200">
               <div class="text-2xl font-bold text-green-600">{{ getPrintStats.permits }}</div>
               <div class="text-sm text-green-800 font-medium">Permits Printed</div>
-            </div>
-            <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <div class="text-2xl font-bold text-purple-600">{{ getPrintStats.id_cards }}</div>
-              <div class="text-sm text-purple-800 font-medium">ID Cards Printed</div>
             </div>
             <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <div class="text-sm font-medium text-gray-600">Date Range</div>
@@ -3132,9 +2120,6 @@ onMounted(async () => {
                   <th class="p-3 font-semibold text-gray-700 border-b">Driver</th>
                   <th class="p-3 font-semibold text-gray-700 border-b">MTOP No.</th>
                   <th class="p-3 font-semibold text-gray-700 border-b">OR Number</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Body No.</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Sticker No.</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Quarter</th>
                   <th class="p-3 font-semibold text-gray-700 border-b">Actions</th>
                 </tr>
               </thead>
@@ -3142,17 +2127,14 @@ onMounted(async () => {
                 <tr v-for="log in filteredLogs" :key="log.id" class="hover:bg-gray-50">
                   <td class="p-3 border-b text-sm">{{ log.printed_at }}</td>
                   <td class="p-3 border-b">
-                    <span :class="['px-2 py-1 rounded-full text-xs font-medium', log.type === 'permit' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800']">
-                      {{ log.type === 'permit' ? 'Permit' : 'ID Card' }}
+                    <span class="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Permit
                     </span>
                   </td>
                   <td class="p-3 border-b text-sm">{{ log.operator_name }}</td>
                   <td class="p-3 border-b text-sm">{{ log.driver_name }}</td>
                   <td class="p-3 border-b text-sm font-mono">{{ log.mtop_number }}</td>
                   <td class="p-3 border-b text-sm">{{ log.or_number || 'N/A' }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.body_number || 'N/A' }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.sticker_number || 'N/A' }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.quarter }}</td>
                   <td class="p-3 border-b text-sm">
                     <button @click="deleteLog(log.id)" class="text-red-600 hover:text-red-800 transition-colors" title="Delete Log">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3162,7 +2144,7 @@ onMounted(async () => {
                   </td>
                 </tr>
                 <tr v-if="filteredLogs.length === 0">
-                  <td colspan="10" class="p-6 text-center text-gray-500">
+                  <td colspan="7" class="p-6 text-center text-gray-500">
                     No print activity found for the selected date range.
                   </td>
                 </tr>
@@ -3249,7 +2231,6 @@ onMounted(async () => {
                   <th class="p-3 font-semibold text-gray-700 border-b">Driver</th>
                   <th class="p-3 font-semibold text-gray-700 border-b">MTOP No.</th>
                   <th class="p-3 font-semibold text-gray-700 border-b">OR Number</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Quarter</th>
                   <th class="p-3 font-semibold text-gray-700 border-b">Actions</th>
                 </tr>
               </thead>
@@ -3260,7 +2241,6 @@ onMounted(async () => {
                   <td class="p-3 border-b text-sm">{{ log.driver_name }}</td>
                   <td class="p-3 border-b text-sm font-mono">{{ log.mtop_number }}</td>
                   <td class="p-3 border-b text-sm">{{ log.or_number || 'N/A' }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.quarter }}</td>
                   <td class="p-3 border-b text-sm">
                     <button @click="deleteLog(log.id)" class="text-red-600 hover:text-red-800 transition-colors" title="Delete Log">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3270,113 +2250,7 @@ onMounted(async () => {
                   </td>
                 </tr>
                 <tr v-if="filteredPermitLogs.length === 0">
-                  <td colspan="7" class="p-6 text-center text-gray-500">No permit print activity found for the selected date range.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ID Report Modal -->
-    <div v-if="showIdReportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
-        <div class="p-6">
-          <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-semibold text-gray-900">ID Card Printing Report</h3>
-            <button @click="closePrintModal" class="text-gray-500 hover:text-gray-700">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <!-- Date Range Filter -->
-          <div class="bg-gray-50 p-4 rounded-lg mb-6">
-            <h4 class="text-lg font-medium text-gray-700 mb-4">Filter by Date Range</h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                <input v-model="reportDateRange.start" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                <input v-model="reportDateRange.end" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div class="flex items-end">
-                <button @click="loadPrintLogs" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Apply Filter</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Statistics -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div class="bg-green-50 p-4 rounded-lg border border-green-200">
-              <div class="text-2xl font-bold text-green-600">{{ getIdStats.total }}</div>
-              <div class="text-sm text-green-800 font-medium">ID Cards Printed</div>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <div class="text-sm font-medium text-gray-600">Date Range</div>
-              <div class="text-sm text-gray-800">{{ getIdStats.date_range }}</div>
-            </div>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="flex gap-3 mb-6">
-            <button @click="printIdReport" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2" :disabled="reportLoading">
-              <span v-if="reportLoading" class="spinner-border inline-block h-4 w-4 animate-spin rounded-full border-2 border-t-white border-green-200"></span>
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              Print Report
-            </button>
-            <button @click="exportIdReport" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export CSV
-            </button>
-            <button @click="clearAllLogs" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-2 ml-auto">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Clear All Logs
-            </button>
-          </div>
-
-          <!-- Logs Table -->
-          <div class="overflow-auto max-h-96">
-            <table class="w-full text-left border-collapse">
-              <thead class="bg-gray-50 sticky top-0">
-                <tr>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Date & Time</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Operator</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Driver</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">MTOP No.</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Body No.</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Sticker No.</th>
-                  <th class="p-3 font-semibold text-gray-700 border-b">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="log in filteredIdLogs" :key="log.id" class="hover:bg-gray-50">
-                  <td class="p-3 border-b text-sm">{{ log.printed_at }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.operator_name }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.driver_name }}</td>
-                  <td class="p-3 border-b text-sm font-mono">{{ log.mtop_number }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.body_number || 'N/A' }}</td>
-                  <td class="p-3 border-b text-sm">{{ log.sticker_number || 'N/A' }}</td>
-                  <td class="p-3 border-b text-sm">
-                    <button @click="deleteLog(log.id)" class="text-red-600 hover:text-red-800 transition-colors" title="Delete Log">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="filteredIdLogs.length === 0">
-                  <td colspan="7" class="p-6 text-center text-gray-500">No ID card print activity found for the selected date range.</td>
+                  <td colspan="6" class="p-6 text-center text-gray-500">No permit print activity found for the selected date range.</td>
                 </tr>
               </tbody>
             </table>
