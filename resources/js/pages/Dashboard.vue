@@ -549,6 +549,7 @@ const printPermit = () => {
             white-space: nowrap;
           }
 
+          /* UPDATED HEADER WITH LOGO */
           .permit-header {
             text-align: center;
             margin-bottom: 8mm;
@@ -556,6 +557,26 @@ const printPermit = () => {
             padding-bottom: 4mm;
             position: relative;
             z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8mm;
+          }
+
+          .logo-container {
+            flex-shrink: 0;
+          }
+
+          .municipality-logo {
+            height: 25mm;
+            width: auto;
+            object-fit: contain;
+            filter: grayscale(100%) brightness(0%);
+          }
+
+          .header-text {
+            flex: 1;
+            text-align: center;
           }
 
           .permit-header h1 {
@@ -564,6 +585,7 @@ const printPermit = () => {
             color: ${colors.primaryColor};
             font-weight: bold;
             text-transform: uppercase;
+            line-height: 1.2;
           }
 
           .permit-header h2 {
@@ -571,6 +593,7 @@ const printPermit = () => {
             font-size: 18px;
             color: #374151;
             font-weight: 600;
+            line-height: 1.2;
           }
 
           .permit-header h3 {
@@ -578,6 +601,7 @@ const printPermit = () => {
             font-size: 12px;
             color: #6b7280;
             font-weight: normal;
+            line-height: 1.2;
           }
 
           .validity-section {
@@ -854,10 +878,19 @@ const printPermit = () => {
           <!-- BACKGROUND ELEMENT -->
           <div class="permit-background"></div>
 
+          <!-- UPDATED HEADER WITH LOGO -->
           <div class="permit-header">
-            <h1>MUNICIPALITY OF MARAMAG</h1>
-            <h2>TRICYCLE OPERATOR'S PERMIT</h2>
-            <h3>OFFICE OF THE MAYOR - MUNICIPAL PERMITS & LICENSING</h3>
+            <div class="logo-container">
+              <img src="./maramag_logo.png" alt="Municipality of Maramag Logo" class="municipality-logo" onerror="this.style.display='none'">
+            </div>
+            <div class="header-text">
+              <h1>MUNICIPALITY OF MARAMAG</h1>
+              <h2>TRICYCLE OPERATOR'S PERMIT</h2>
+              <h3>OFFICE OF THE MAYOR - MUNICIPAL PERMITS & LICENSING</h3>
+            </div>
+            <div class="logo-container">
+              <img src="./bplo_logo.png" alt="Business Permit and Licensing Office Logo" class="municipality-logo" onerror="this.style.display='none'">
+            </div>
           </div>
 
           ${isRetired ? `
@@ -1507,6 +1540,7 @@ const printPermitReport = () => {
       <body>
         <div class="report-container">
           <div class="report-header">
+
             <h1>MUNICIPALITY OF MARAMAG</h1>
             <h2>PERMIT PRINTING REPORT</h2>
             <h3>MARAMAG MOTORIZED TRICYCLE FRANCHISING REGULATORY BOARD</h3>
